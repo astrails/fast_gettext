@@ -15,10 +15,6 @@ module FastGettext
         @model = options[:model]
       end
 
-      @@seperator = '||||' # string that seperates multiple plurals
-      def self.seperator=(sep);@@seperator = sep;end
-      def self.seperator;@@seperator;end
-
       def available_locales
         if @model.respond_to? :available_locales
           @model.available_locales || []
@@ -39,18 +35,25 @@ module FastGettext
         @model.translation(key, FastGettext.locale)
       end
 
-      def plural(*args)
-        if translation = @model.translation(args*self.class.seperator, FastGettext.locale)
-          translation.to_s.split(self.class.seperator)
-        else
-          []
-        end
+      def plural(*msgids)
+        translations = @model.translation(msgids, FastGettext.locale) || []
+        return translations unless translations.blank? || translations.all?(&:blank?)
+        msgids.map{|msgid| self[msgid] || msgid} #try to translate each id
       end
 
       def self.require_models
         require 'fast_gettext/translation_repository/db_models/translation_key'
         require 'fast_gettext/translation_repository/db_models/translation_text'
         FastGettext::TranslationRepository::DbModels
+      end
+
+      def self.decode_value(value)
+        return unless value
+        value = ActiveSupport::JSON.decode(value)
+        return if value.blank?
+
+        # replace "" with nil
+        value.is_a?(Array) ? value.map {|v| v.blank? ? nil : v} : value
       end
     end
   end
