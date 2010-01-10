@@ -55,6 +55,31 @@ module FastGettext
         # replace "" with nil
         value.is_a?(Array) ? value.map {|v| v.blank? ? nil : v} : value
       end
+
+      def self.preload
+        require_models
+
+        bm = Benchmark.measure do
+
+          FastGettext.available_locales.each do |locale|
+            FastGettext.caches["app"][locale] ||= {}
+          end
+
+          DbModels::TranslationKey.all(:include => :translations).each do |translation_key|
+            key = Db.decode_value(translation_key.key)
+            translation_key.translations.each do |translation_text|
+              value = Db.decode_value(translation_text.text)
+              FastGettext.caches[FastGettext.text_domain][translation_text.locale][key] = value || false
+            end
+            missing = FastGettext.available_locales - translation_key.translations.map(&:locale)
+            missing.each do |locale|
+              FastGettext.caches[FastGettext.text_domain][locale][key] = false
+            end
+          end
+        end
+        logger.info "Preloaded translations: %0.3f sec" % bm.real
+      end
+
     end
   end
 end
