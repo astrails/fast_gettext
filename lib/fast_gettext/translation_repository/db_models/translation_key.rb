@@ -6,6 +6,21 @@ module FastGettext::TranslationRepository
       attr_accessible :key, :key_value, :translations_attributes
       accepts_nested_attributes_for :translations
 
+      validates_uniqueness_of :key
+      validates_presence_of :key
+
+      named_scope :by_locale, proc { |loc|
+        {
+          :include => :translations,
+          :conditions => loc.blank? ? nil : ["translation_texts.locale = ?", loc],
+        }
+      }
+
+      named_scope :untranslated, {
+        :include => :translations,
+        :conditions => ["translation_texts.text LIKE ?", '%""%'],
+      }
+
       def key_value=(value)
         write_attribute(:key, ActiveSupport::JSON.encode(value))
       end
